@@ -429,6 +429,10 @@ void FilterFunctions(ea_t start, ea_t end, CallGraph* call_graph,
     }
   }
   call_graph->DeleteVertices(start, end);
+  for (auto it = flow_graphs->begin(); it != flow_graphs->end(); ++it) {
+    FlowGraph* graph = *it;
+    graph->SetCallGraph(call_graph);
+  }
 }
 
 absl::StatusOr<bool> DiffAddressRange(ea_t start_address_source,
