@@ -432,6 +432,11 @@ void FilterFunctions(ea_t start, ea_t end, CallGraph* call_graph,
   for (auto it = flow_graphs->begin(); it != flow_graphs->end(); ++it) {
     FlowGraph* graph = *it;
     graph->SetCallGraph(call_graph);
+
+    Address address = graph->GetEntryPointAddress();
+    FlowGraphInfo& info = (*flow_graph_infos)[address];
+    info.name = &graph->GetName();
+    info.demangled_name = &graph->GetDemangledName();
   }
 }
 
