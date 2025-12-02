@@ -443,44 +443,67 @@ void FilterFunctions(ea_t start, ea_t end, CallGraph* call_graph,
 absl::StatusOr<bool> DiffAddressRange(ea_t start_address_source,
                                       ea_t end_address_source,
                                       ea_t start_address_target,
-                                      ea_t end_address_target) {
+                                      ea_t end_address_target,
+                                      bool skip_binexport) {
   Plugin& plugin = *Plugin::instance();
   plugin.DiscardResults(Plugin::DiscardResultsKind::kDontSave);
   Timer<> timer;
+  std::string filename1;
+  std::string filename2;
 
-  NA_ASSIGN_OR_RETURN(const bool exported, ExportIdbs());
-  if (!exported) {
-    return false;
-  }
+  if (skip_binexport) {
+    absl::StatusOr<std::string> primary_bp = GetOpenFilename(
+        "Select Primary BinExport File", "*.BinExport",
+        {{"BinExport Dump File", "*.BinExport"}, {"All files", kAllFilesFilter}});
+    if (!primary_bp.ok()) {
+      return false;
+    }
 
-  LOG(INFO) << absl::StrCat(HumanReadableDuration(timer.elapsed()),
-                            " for exports...");
-  LOG(INFO) << absl::StrCat(
-      "Diffing address range primary(", FormatAddress(start_address_source),
-      " - ", FormatAddress(end_address_source), ") vs secondary(",
-      FormatAddress(start_address_target), " - ",
-      FormatAddress(end_address_target), ")");
-  timer.restart();
+    absl::StatusOr<std::string> secondary_bp = GetOpenFilename(
+        "Select Secondary BinExport File", "*.BinExport",
+        {{"BinExport Dump File", "*.BinExport"}, {"All files", kAllFilesFilter}});
+    if (!secondary_bp.ok()) {
+      return false;
+    }
 
-  WaitBox wait_box("Performing diff...");
-  // TODO(cblichmann): Create directory with random suffix, so that multiple
-  //                   invocations don't interfere with each other.
-  NA_ASSIGN_OR_RETURN(const std::string temp_dir,
-                      GetOrCreateTempDirectory("BinDiff"));
-  const std::string filename1 =
-      FindFile(JoinPath(temp_dir, "primary"), ".BinExport");
-  if (filename1.empty()) {
-    return absl::FailedPreconditionError(
-        "Exporting the primary (this) database failed.\n"
-        "Please check whether the BinExport plugin is installed correctly.");
-  }
-  const std::string filename2 =
-      FindFile(JoinPath(temp_dir, "secondary"), ".BinExport");
-  if (filename2.empty()) {
-    return absl::FailedPreconditionError(
-        "Exporting the secondary database failed. "
-        "Is it opened in another instance?\n"
-        "Please close all other IDA instances and try again.");
+    filename1 = *primary_bp;
+    filename2 = *secondary_bp;
+
+    LOG(INFO) << absl::StrCat("Primary BinExport file path: ", filename1);
+    LOG(INFO) << absl::StrCat("Secondary BinExport file path: ", filename1);
+  } else {
+    NA_ASSIGN_OR_RETURN(const bool exported, ExportIdbs());
+    if (!exported) {
+      return false;
+    }
+
+    LOG(INFO) << absl::StrCat(HumanReadableDuration(timer.elapsed()),
+                              " for exports...");
+    LOG(INFO) << absl::StrCat(
+        "Diffing address range primary(", FormatAddress(start_address_source),
+        " - ", FormatAddress(end_address_source), ") vs secondary(",
+        FormatAddress(start_address_target), " - ",
+        FormatAddress(end_address_target), ")");
+    timer.restart();
+
+    WaitBox wait_box("Performing diff...");
+    // TODO(cblichmann): Create directory with random suffix, so that multiple
+    //                   invocations don't interfere with each other.
+    NA_ASSIGN_OR_RETURN(const std::string temp_dir,
+                        GetOrCreateTempDirectory("BinDiff"));
+    filename1 = FindFile(JoinPath(temp_dir, "primary"), ".BinExport");
+    if (filename1.empty()) {
+      return absl::FailedPreconditionError(
+          "Exporting the primary (this) database failed.\n"
+          "Please check whether the BinExport plugin is installed correctly.");
+    }
+    filename2 = FindFile(JoinPath(temp_dir, "secondary"), ".BinExport");
+    if (filename2.empty()) {
+      return absl::FailedPreconditionError(
+          "Exporting the secondary database failed. "
+          "Is it opened in another instance?\n"
+          "Please close all other IDA instances and try again.");
+    }
   }
 
   NA_RETURN_IF_ERROR(plugin.ClearResults());
@@ -548,6 +571,7 @@ bool DoDiffDatabase(bool filtered) {
   ea_t end_address_source = std::numeric_limits<ea_t>::max() - 1;
   ea_t start_address_target = 0;
   ea_t end_address_target = std::numeric_limits<ea_t>::max() - 1;
+  bool skip_binexport = false;
 
   if (filtered) {
     constexpr char kDialog[] =
@@ -557,16 +581,17 @@ bool DoDiffDatabase(bool filtered) {
         "  <Start address (primary)      :$::16::>\n"
         "  <End address (primary):$::16::>\n"
         "  <Start address (secondary):$::16::>\n"
-        "  <End address (secondary):$::16::>\n\n";
+        "  <End address (secondary):$::16::>\n\n"
+        "  <Skip binexport step if result exists:C>>\n\n";
     if (!ask_form(kDialog, &start_address_source, &end_address_source,
-                  &start_address_target, &end_address_target)) {
+                  &start_address_target, &end_address_target, &skip_binexport)) {
       return false;
     }
   }
 
   absl::StatusOr<bool> diffed =
       DiffAddressRange(start_address_source, end_address_source,
-                       start_address_target, end_address_target);
+                       start_address_target, end_address_target, skip_binexport);
   if (!diffed.ok()) {
     const std::string error_message =
         absl::StrCat("Error while diffing: ", diffed.status().message());
