@@ -744,7 +744,7 @@ DatabaseReader::DatabaseReader(SqliteDatabase& database,
   std::replace(path_.begin(), path_.end(), '\\', '/');
   const std::string::size_type pos = path_.rfind('/');
   if (pos != std::string::npos) {
-    path_ = path_.substr(0, pos + 1);
+    path_ = path_.substr(0, pos);
   }
 }
 
