@@ -571,7 +571,7 @@ bool DoDiffDatabase(bool filtered) {
   ea_t end_address_source = std::numeric_limits<ea_t>::max() - 1;
   ea_t start_address_target = 0;
   ea_t end_address_target = std::numeric_limits<ea_t>::max() - 1;
-  bool skip_binexport = false;
+  ushort skip_binexport = 0;
 
   if (filtered) {
     constexpr char kDialog[] =
@@ -591,7 +591,7 @@ bool DoDiffDatabase(bool filtered) {
 
   absl::StatusOr<bool> diffed =
       DiffAddressRange(start_address_source, end_address_source,
-                       start_address_target, end_address_target, skip_binexport);
+                       start_address_target, end_address_target, skip_binexport == 0);
   if (!diffed.ok()) {
     const std::string error_message =
         absl::StrCat("Error while diffing: ", diffed.status().message());
@@ -725,9 +725,7 @@ absl::Status WriteResults(const std::string& filename) {
   std::replace(export2.begin(), export2.end(), '/', '\\');
 #endif
   if (const std::string new_export1 = JoinPath(out_dir, Basename(export1));
-      export1 != new_export1) {
-    LOG(INFO) << absl::StrCat("old BinExport file path: ", export1);
-    LOG(INFO) << absl::StrCat("new BinExport file path: ", new_export1);        
+      export1 != new_export1) {      
     std::remove(new_export1.c_str());
     NA_RETURN_IF_ERROR(CopyFile(export1, new_export1));
   }
