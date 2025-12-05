@@ -85,7 +85,12 @@ class Reader {
   virtual absl::Status Read(CallGraph& call_graph1, CallGraph& call_graph2,
                             FlowGraphInfos& flow_graphs1,
                             FlowGraphInfos& flow_graphs2,
-                            FixedPointInfos& fixed_points) = 0;
+                            FixedPointInfos& fixed_points,
+                            Address& start_address1,
+                            Address& end_address1,
+                            Address& start_address2,
+                            Address& end_address2) = 0;
+
 
   double similarity() const { return similarity_; }
   double confidence() const { return confidence_; }

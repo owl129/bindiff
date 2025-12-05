@@ -1303,7 +1303,8 @@ void Results::Read(Reader* reader) {
 
   incomplete_ = true;
   if (auto status = reader->Read(call_graph1_, call_graph2_, flow_graph_infos1_,
-                                 flow_graph_infos2_, fixed_point_infos_);
+                                 flow_graph_infos2_, fixed_point_infos_, start_address1_,
+                                 end_address1_, start_address2_, end_address2_);
       !status.ok()) {
     throw std::runtime_error(std::string(status.message()));
   }
@@ -1313,6 +1314,9 @@ void Results::Read(Reader* reader) {
   } else {
     CHECK(false && "unsupported reader");
   }
+
+  FilterFunctions(start_address1_, end_address1_, call_graph1_, flow_graph_infos1_);
+  FilterFunctions(start_address2_, end_address2_, call_graph2_, flow_graph_infos2_);
 
   InitializeIndexedVectors();
   Count();
@@ -1328,6 +1332,14 @@ void Results::Read(Reader* reader) {
 absl::Status Results::Write(Writer* writer) {
   NA_RETURN_IF_ERROR(writer->Write(call_graph1_, call_graph2_, flow_graphs1_,
                                    flow_graphs2_, fixed_points_));
+  modified_ = false;
+  return absl::OkStatus();
+}
+
+absl::Status Results::WriteRange(DatabaseWriter* writer) {
+  NA_RETURN_IF_ERROR(writer->Write(call_graph1_, call_graph2_, flow_graphs1_,
+                                   flow_graphs2_, fixed_points_, start_address1_,
+                                   end_address1_, start_address2_, end_address2_));
   modified_ = false;
   return absl::OkStatus();
 }
@@ -1649,6 +1661,24 @@ void Results::Count() {
       counts_[Counts::kFlowGraphEdgeMatchesNonLibrary] += entry.edge_count;
     }
     histogram_[*entry.algorithm]++;
+  }
+}
+
+void Results::FilterFunctions(Address start, Address end, CallGraph& call_graph,
+                     FlowGraphInfos& flow_graph_infos) {
+  call_graph.DeleteVertices(start, end);
+  for (auto it = flow_graph_infos.begin(); it != flow_graph_infos.end();) {
+    Address addr = it->first;
+    if (addr < start || addr > end) {
+      it = flow_graph_infos.erase(it);
+    } else {
+      CallGraph::Vertex vertex = call_graph.GetVertex(addr);
+      FlowGraphInfo& info = it->second;
+      info.name = &call_graph.GetName(vertex);
+      info.demangled_name = &call_graph.GetDemangledName(vertex);
+      
+      ++it;
+    }
   }
 }
 

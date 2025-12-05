@@ -60,6 +60,15 @@ class DatabaseWriter : public Writer {
                      const FlowGraphs& flow_graphs2,
                      const FixedPoints& fixed_points) override;
 
+  absl::Status Write(const CallGraph& call_graph1, const CallGraph& call_graph2,
+                     const FlowGraphs& flow_graphs1,
+                     const FlowGraphs& flow_graphs2,
+                     const FixedPoints& fixed_points,
+                     const Address start_address1,
+                     const Address end_address1,
+                     const Address start_address2,
+                     const Address end_address2);
+
   void Close();
   void WriteToTempDatabase(const FixedPoint& fixed_point);
   void DeleteFromTempDatabase(Address primary, Address secondary);
@@ -83,7 +92,11 @@ class DatabaseWriter : public Writer {
                              const CallGraph& call_graph2,
                              const FlowGraphs& flow_graphs1,
                              const FlowGraphs& flow_graphs2,
-                             const FixedPoints& fixed_points);
+                             const FixedPoints& fixed_points,
+                             const Address start_address1,
+                             const Address end_address1,
+                             const Address start_address2,
+                             const Address end_address2);
   absl::Status WriteMatches(const FixedPoints& fixed_points);
   absl::Status WriteAlgorithms();
 
@@ -124,7 +137,10 @@ class DatabaseReader : public Reader {
                           const std::string& temp_directory);
   absl::Status Read(CallGraph& call_graph1, CallGraph& call_graph2,
                     FlowGraphInfos& flow_graphs1, FlowGraphInfos& flow_graphs2,
-                    FixedPointInfos& fixed_points) override;
+                    FixedPointInfos& fixed_points, Address& start_address1,
+                    Address& end_address1,
+                    Address& start_address2,
+                    Address& end_address2) override;
 
   static void ReadFullMatches(SqliteDatabase* database, CallGraph* call_graph1,
                               CallGraph* call_graph2, FlowGraphs* flow_graphs1,

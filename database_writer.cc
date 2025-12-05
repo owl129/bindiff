@@ -236,7 +236,9 @@ absl::Status DatabaseWriter::PrepareDatabase() {
                         "edges INT,"
                         "libedges INT,"
                         "instructions INT,"
-                        "libinstructions INT"
+                        "libinstructions INT,"
+                        "start_address BIGINT,"
+                        "end_address BIGINT"
                         ")"));
   NA_RETURN_IF_ERROR(
       database_.Execute("CREATE TABLE metadata ("
@@ -297,7 +299,11 @@ absl::Status DatabaseWriter::WriteMetadata(const CallGraph& call_graph1,
                                            const CallGraph& call_graph2,
                                            const FlowGraphs& flow_graphs1,
                                            const FlowGraphs& flow_graphs2,
-                                           const FixedPoints& fixed_points) {
+                                           const FixedPoints& fixed_points,
+                                           const Address start_address1,
+                                           const Address end_address1,
+                                           const Address start_address2,
+                                           const Address end_address2) {
   Confidences confidences;
   Histogram histogram;
   Counts counts;
@@ -312,7 +318,7 @@ absl::Status DatabaseWriter::WriteMetadata(const CallGraph& call_graph1,
           "INSERT INTO file VALUES ("
           ":id,:filename,:exefilename,:hash,:functions,:libfunctions,:calls,"
           ":basicblocks,:libbasicblocks,:edges,:libedges,:instructions,"
-          ":libinstructions"
+          ":libinstructions,:start_address,:end_address"
           ")"));
   NA_RETURN_IF_ERROR(
       stmt.BindInt(file1)
@@ -328,6 +334,8 @@ absl::Status DatabaseWriter::WriteMetadata(const CallGraph& call_graph1,
           .BindInt(counts[Counts::kFlowGraphEdgesPrimaryLibrary])
           .BindInt(counts[Counts::kInstructionsPrimaryNonLibrary])
           .BindInt(counts[Counts::kInstructionsPrimaryLibrary])
+          .BindInt64(start_address1)
+          .BindInt64(end_address1)
           .Execute());
 
   NA_ASSIGN_OR_RETURN(
@@ -336,7 +344,7 @@ absl::Status DatabaseWriter::WriteMetadata(const CallGraph& call_graph1,
           "INSERT INTO file VALUES ("
           ":id,:filename,:exefilename,:hash,:functions,:libfunctions,:calls,"
           ":basicblocks,:libbasicblocks,:edges,:libedges,:instructions,"
-          ":libinstructions"
+          ":libinstructions,:start_address,:end_address"
           ")"));
   NA_RETURN_IF_ERROR(
       stmt.BindInt(file2)
@@ -352,6 +360,8 @@ absl::Status DatabaseWriter::WriteMetadata(const CallGraph& call_graph1,
           .BindInt(counts[Counts::kFlowGraphEdgesSecondaryLibrary])
           .BindInt(counts[Counts::kInstructionsSecondaryNonLibrary])
           .BindInt(counts[Counts::kInstructionsSecondaryLibrary])
+          .BindInt64(start_address2)
+          .BindInt64(end_address2)
           .Execute());
 
   NA_ASSIGN_OR_RETURN(
@@ -539,10 +549,29 @@ absl::Status DatabaseWriter::Write(const CallGraph& call_graph1,
                                    const FlowGraphs& flow_graphs1,
                                    const FlowGraphs& flow_graphs2,
                                    const FixedPoints& fixed_points) {
+  return Write(call_graph1, call_graph2, flow_graphs1, flow_graphs2, fixed_points,
+               0ULL, 0xffffffffffffffffULL, 0ULL, 0xffffffffffffffffULL);
+}
+
+absl::Status DatabaseWriter::Write(const CallGraph& call_graph1, 
+                                   const CallGraph& call_graph2,
+                                   const FlowGraphs& flow_graphs1,
+                                   const FlowGraphs& flow_graphs2,
+                                   const FixedPoints& fixed_points,
+                                   const Address start_address1,
+                                   const Address end_address1,
+                                   const Address start_address2,
+                                   const Address end_address2){
+  LOG(INFO) << absl::StrCat(
+        "Database write range primary(", FormatAddress(start_address1),
+        " - ", FormatAddress(end_address1), ") vs secondary(",
+        FormatAddress(start_address2), " - ",
+        FormatAddress(end_address2), ")");
   NA_RETURN_IF_ERROR(database_.Begin());
   if (absl::Status status = [&]() {
         NA_RETURN_IF_ERROR(WriteMetadata(call_graph1, call_graph2, flow_graphs1,
-                                         flow_graphs2, fixed_points));
+                                         flow_graphs2, fixed_points, start_address1,
+                                         end_address1, start_address2, end_address2));
         NA_RETURN_IF_ERROR(WriteAlgorithms());
         NA_RETURN_IF_ERROR(WriteMatches(fixed_points));
         return absl::OkStatus();
@@ -827,13 +856,19 @@ absl::Status DatabaseReader::Read(CallGraph& call_graph1,
                                   CallGraph& call_graph2,
                                   FlowGraphInfos& flow_graphs1,
                                   FlowGraphInfos& flow_graphs2,
-                                  FixedPointInfos& fixed_points) {
+                                  FixedPointInfos& fixed_points,
+                                  Address& start_address1,
+                                  Address& end_address1,
+                                  Address& start_address2,
+                                  Address& end_address2) {
   absl::flat_hash_set<FixedPointInfo> database_fixed_points;
   try {
     database_
         .StatementOrThrow(
             "SELECT "
             " file1.filename AS filename1, file2.filename AS filename2, "
+            " file1.start_address, file1.end_address, "
+            " file2.start_address, file2.end_address, "
             " similarity, confidence "
             "FROM metadata "
             "INNER JOIN file AS file1 ON file1.id = file1 "
@@ -841,6 +876,10 @@ absl::Status DatabaseReader::Read(CallGraph& call_graph1,
         .ExecuteOrThrow()
         .Into(&primary_filename_)
         .Into(&secondary_filename_)
+        .Into(&start_address1)
+        .Into(&end_address1)
+        .Into(&start_address2)
+        .Into(&end_address2)
         .Into(&similarity_)
         .Into(&confidence_);
 

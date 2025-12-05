@@ -113,6 +113,7 @@ class Results {
   bool PrepareVisualCallGraphDiff(size_t index, std::string* message);
   void Read(Reader* reader);
   absl::Status Write(Writer* writer);
+  absl::Status WriteRange(DatabaseWriter* writer);
   void CreateIndexedViews();
 
   // Marks the matches indicated by the given indices as manually confirmed.
@@ -156,6 +157,11 @@ class Results {
   FlowGraphInfos flow_graph_infos1_;
   FlowGraphInfos flow_graph_infos2_;
 
+  Address start_address1_;
+  Address end_address1_;
+  Address start_address2_;
+  Address end_address2_;
+
  private:
   using IndexedFlowGraphs = std::vector<FlowGraphInfo*>;
   using IndexedFixedPoints = std::vector<FixedPointInfo*>;
@@ -176,6 +182,8 @@ class Results {
   FixedPoint* FindFixedPoint(const FixedPointInfo& info);
   void ReadBasicblockMatches(FixedPoint* fixed_point);
   void MarkPortedCommentsInTempDatabase();
+  void FilterFunctions(Address start, Address end, CallGraph& call_graph,
+                     FlowGraphInfos& flow_graph_infos);
 
   std::unique_ptr<DatabaseWriter> temp_database_;
   bool incomplete_ = false;  // Set when we have loaded from disk

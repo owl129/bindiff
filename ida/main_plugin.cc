@@ -525,6 +525,11 @@ absl::StatusOr<bool> DiffAddressRange(ea_t start_address_source,
       start_address_target, end_address_target, &context.secondary_call_graph_,
       &context.secondary_flow_graphs_, &results->flow_graph_infos2_);
 
+  results->start_address1_ = start_address_source;
+  results->end_address1_ = end_address_source;
+  results->start_address2_ = start_address_target;
+  results->end_address2_ = end_address_target;
+
   const MatchingSteps callgraph_steps = GetDefaultMatchingSteps();
   const MatchingStepsFlowGraph basicblock_steps =
       GetDefaultMatchingStepsBasicBlock();
@@ -591,7 +596,7 @@ bool DoDiffDatabase(bool filtered) {
 
   absl::StatusOr<bool> diffed =
       DiffAddressRange(start_address_source, end_address_source,
-                       start_address_target, end_address_target, skip_binexport == 0);
+                       start_address_target, end_address_target, skip_binexport != 0);
   if (!diffed.ok()) {
     const std::string error_message =
         absl::StrCat("Error while diffing: ", diffed.status().message());
@@ -703,7 +708,7 @@ absl::Status WriteResults(const std::string& filename) {
             filename,
             DatabaseWriter::Options().set_include_function_names(
                 !config::Proto().binary_format().exclude_function_names())));
-    NA_RETURN_IF_ERROR(results->Write(writer.get()));
+    NA_RETURN_IF_ERROR(results->WriteRange(writer.get()));
   } else {
     // Results are incomplete (have been loaded). Copy original result file to
     // temp dir first, so we can overwrite the original if required.
