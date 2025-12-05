@@ -582,7 +582,7 @@ bool DoDiffDatabase(bool filtered) {
         "  <End address (primary):$::16::>\n"
         "  <Start address (secondary):$::16::>\n"
         "  <End address (secondary):$::16::>\n\n"
-        "  <Skip binexport step if result exists:C>>\n\n";
+        "  <Skip Binexport step. (Use previous result):C>>\n\n";
     if (!ask_form(kDialog, &start_address_source, &end_address_source,
                   &start_address_target, &end_address_target, &skip_binexport)) {
       return false;
@@ -690,8 +690,8 @@ constexpr ext_idcfunc_t kBinDiffDatabaseIdcFunc = {
 absl::Status WriteResults(const std::string& filename) {
   LOG(INFO) << "Writing results...";
   auto* results = Plugin::instance()->results();
-  const std::string export1 = results->call_graph1_.GetFilePath();
-  const std::string export2 = results->call_graph2_.GetFilePath();
+  std::string export1 = results->call_graph1_.GetFilePath();
+  std::string export2 = results->call_graph2_.GetFilePath();
   NA_ASSIGN_OR_RETURN(const std::string temp_dir,
                       GetOrCreateTempDirectory("BinDiff"));
   const std::string out_dir = Dirname(filename);
@@ -720,8 +720,14 @@ absl::Status WriteResults(const std::string& filename) {
     NA_RETURN_IF_ERROR(CopyFile(input_bindiff, filename));
     std::remove(input_bindiff.c_str());
   }
+#ifdef WIN32
+  std::replace(export1.begin(), export1.end(), '/', '\\');
+  std::replace(export2.begin(), export2.end(), '/', '\\');
+#endif
   if (const std::string new_export1 = JoinPath(out_dir, Basename(export1));
       export1 != new_export1) {
+    LOG(INFO) << absl::StrCat("old BinExport file path: ", export1);
+    LOG(INFO) << absl::StrCat("new BinExport file path: ", new_export1);        
     std::remove(new_export1.c_str());
     NA_RETURN_IF_ERROR(CopyFile(export1, new_export1));
   }
