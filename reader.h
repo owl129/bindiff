@@ -69,7 +69,7 @@ struct FixedPointInfo {
   bool evaluate;
   bool comments_ported;
 };
-using FixedPointInfos = absl::btree_set<FixedPointInfo>;
+using FixedPointInfos = std::set<FixedPointInfo>;
 
 bool operator<(const FixedPointInfo& one, const FixedPointInfo& two);
 
