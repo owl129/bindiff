@@ -470,7 +470,7 @@ absl::StatusOr<bool> DiffAddressRange(ea_t start_address_source,
     filename2 = *secondary_bp;
 
     LOG(INFO) << absl::StrCat("Primary BinExport file path: ", filename1);
-    LOG(INFO) << absl::StrCat("Secondary BinExport file path: ", filename1);
+    LOG(INFO) << absl::StrCat("Secondary BinExport file path: ", filename2);
   } else {
     NA_ASSIGN_OR_RETURN(const bool exported, ExportIdbs());
     if (!exported) {
