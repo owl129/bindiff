@@ -56,9 +56,9 @@ namespace {
 // single function. If a function has more than this, we simply discard it as
 // invalid.
 enum {
-  kMaxFunctionBasicBlocks = 5000,
-  kMaxFunctionEdges = 5000,
-  kMaxFunctionInstructions = 10000
+  kMaxFunctionBasicBlocks = 50000,
+  kMaxFunctionEdges = 50000,
+  kMaxFunctionInstructions = 100000
 };
 
 // Translates from BinExport2 protocol buffer edge type to the one used
